@@ -7,7 +7,7 @@ library(rstan)
 library(loo)
 library(caret)
 library(Biobase)
-memory.limit(1e13)
+memory.limit(1e10)
 md <- read_rds("C:/RFactory/bymetabric_files/rdsmetabric/Med_Data_Clean.rds")
 gd <- read_rds("C:/RFactory/bymetabric_files/rdsmetabric/Gen_Data.rds")
 load("Gen_data_fun.Rdata")
@@ -25,7 +25,7 @@ stannull <- rstan::stan(stan_file_null,
 log_liknull <- loo::extract_log_lik(stannull, parameter_name = "log_lik")
 loonull <- loo::loo(log_liknull)
 print(loonull)
-saveRDS(stannull, file = "bysfit/stannul.rds")
+saveRDS(stannull, file = "C:/RFactory/bymetabric_files/bysfit/stannul.rds")
 rm(list = c('stannull', 'log_liknull'))
 
 
