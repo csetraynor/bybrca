@@ -32,7 +32,8 @@ gen_inits0 <- function() {
 gen_stan_data1 <- function(data) {
   # Subgroup indicator
   J1group = as.integer(data$cohort)
-  J2group = as.integer(as.factor(data$intclust))
+  
+  J2group = as.integer(data$intclust)
   ind = data$status == 1
   
   stan_data <- list(
@@ -48,8 +49,8 @@ gen_stan_data1 <- function(data) {
     J2cen = as.numeric(J2group[!ind])
   )
 }
-# gen_stan_data(md)
-# glimpse(into_data)
+ gen_stan_data1(md) %>% glimpse
+ #glimpse(into_data)
 # rstan::stan_rdump(ls(into_data), file = "checking.data.R",
 #                   envir = list2env(into_data))
 
@@ -184,24 +185,23 @@ gen_stan_data3 <- function(data, eset = NA) {
 # Z <- md %>%
 #   model.matrix(~ stage + er + pr+ her2 + menopause , data = .)
 # attr(Z, "dimnames")[[2]][-1]
-gen_stan_data3(md, eset = gd) %>% glimpse()
-# rstan::stan_rdump(ls(into_data), file = "checking.data.R",
-#                   envir = list2env(into_data))
-
+gen_stan_data3(md, eset = gd) %>% glimpse
+ into_data = gen_stan_data3(md, eset = gd)
+  rstan::stan_rdump(ls(into_data), file = "gene.data.R",
+                    envir = list2env(into_data))
+#Inits for select
 gen_inits3 <- function(J1, J2, M) {
  # function()
     list(
       alpha_raw = 0.01*rnorm(1),
       mu = rnorm(1),
       
-      tau_s1_g_raw = 0.1*abs(rnorm(J2)),
-      tau_s2_g_raw = 0.1*abs(rnorm(J2)),
-      beta_b_raw = array(rnorm(M*J2), dim = c(M, J2)),
-      mu_beta = rnorm(M),
-      sigma_beta = abs(rnorm(M)),
+      beta_g_raw = array(rnorm(M*J2), dim = c(J2, M)),
       
-      tau1_g_raw = abs(array(rnorm(M*J2), dim = c(M, J2))),
-      tau2_g_raw = abs(array(rnorm(M*J2), dim = c(M, J2))),
+      tau1_global = 0.1*abs(rnorm(J2)),
+      tau2_global = 0.1*abs(rnorm(J2)),
+      tau1_local = abs(array(rnorm(M*J2), dim = c(J2, M))),
+      tau2_local = abs(array(rnorm(M*J2), dim = c(J2, M))),
       
       zeta1 = rnorm(1),
       b1 = rnorm(J1),
@@ -212,9 +212,9 @@ gen_inits3 <- function(J1, J2, M) {
       kappa2 = abs(rcauchy(1, 0, 2))
     )
 }
-init =  gen_inits3(J1 = 5, J2 = 11, M = 24368)
-rstan::stan_rdump(ls(init), file = "gen.init.R",
-                  envir = list2env(init))
+ init =  gen_inits3(J1 = 5, J2 = 11, M = 4715)
+ rstan::stan_rdump(ls(init), file = "gen.init.R",
+                   envir = list2env(init))
 ##--- Gen Stan Data Clinico Genomic Model---#
 gen_stan_data4 <- function(data, eset = NA , formula = as.formula(~1)) {
   
@@ -291,13 +291,12 @@ gen_inits4 <- function(J1, J2, M, M_g) {
       
       beta_b_raw = rnorm(M),
       
-      tau_s1_g_raw = 0.1*abs(rnorm(1)),
-      tau_s2_g_raw = 0.1*abs(rnorm(1)),
+      tau1_global = 0.1*abs(rnorm(J2)),
+      tau2_global = 0.1*abs(rnorm(J2)),
+      tau1_local = abs(array(rnorm(M*J2), dim = c(M, J2))),
+      tau2_local = abs(array(rnorm(M*J2), dim = c(M, J2))),
       
       beta_g_raw = abs(rnorm(M_g)),
-      
-      tau1_g_raw = abs(rnorm(M_g)),
-      tau2_g_raw = abs(rnorm(M_g)),
       
       zeta1 = rnorm(1),
       b1 = rnorm(J1),

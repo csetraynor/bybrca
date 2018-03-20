@@ -4,6 +4,8 @@ library(VIM)
 library(dplyr)
 #load medical data
 md <- tbl_df(read_rds("C:/RFactory/bymetabric_files/rdsmetabric/medicaldfs.rds"))
+#md <- tbl_df(read_rds("medicaldfs.rds"))
+
 #convert missig values into NA
 convert_blank_to_na <- function(x) {
   if(!purrr::is_character(x)){
@@ -56,9 +58,12 @@ tmp <- mice::mice.impute.polyreg(y = tmp,
 md$tumor_stage[is.na(md$tumor_stage)] <- tmp[is.na(md$tumor_stage)]
 remove(tmp)
 assertthat::assert_that(sum(is.na(md)) == 0)
-
+#Convert intclust as factor 
+md$intclust = as.factor(md$intclust)
+levels(md$intclust) = c("1", "2", "3", "4ER+", "4ER-", "5", "6", "7", "8", "9", "10")
 #--- Gene matrix preprocess ----- #
 gendata <- read_tsv("C:/RFactory/bymetabric_files/metabricdata/brca_metabric/data_expression.txt", col_names = TRUE)
+#gendata <- read_tsv("brca_metabric/data_expression.txt", col_names = TRUE)
 source("https://bioconductor.org/biocLite.R")
 library(Biobase)
 ###
@@ -87,9 +92,23 @@ brcaES <- Biobase::ExpressionSet(x,
                                  phenoData = as(md, "AnnotatedDataFrame"),
                                  featureData = as(gene_names, "AnnotatedDataFrame"))
 assertthat::assert_that(all(md$patient_id == brcaES$patient_id))
-rm(list = "x")
-gene_names <- gene_names %>% unlist
+rm(list = c("x", "gendata"))
+##### Number of genes reduction using Moderated t statistic
+library(limma)
+fit <- limma::lmFit(brcaES, design = as.integer(as.factor(brcaES$intclust)))
+fit <- eBayes(fit)
+print(fit)
+glimpse(fit$p.value)
+test <- exprs(brcaES)[fit$p.value < 0.01,]
+gene_names <- as.data.frame(gene_names[fit$p.value < 0.01,])
+rownames(gene_names) <- gene_names %>% unlist
+brcaES <- Biobase::ExpressionSet(test,
+                                 phenoData = as(md, "AnnotatedDataFrame"),
+                                 featureData =  as(as.data.frame(gene_names), "AnnotatedDataFrame"))
+assertthat::assert_that(all(md$patient_id == brcaES$patient_id))
+rm(list = c("test"))
 #Imputation using impute Biobase
+sum(is.na(exprs(brcaES)))
 require(MSnbase)
 brcaMSN <- MSnbase::as.MSnSet.ExpressionSet(brcaES)
 brcaMSN <- MSnbase::impute(brcaMSN, method = "MinProb")
@@ -97,9 +116,9 @@ Biobase::exprs(brcaES) <- MSnbase::exprs(brcaMSN)
 rm(brcaMSN)
 assertthat::assert_that(sum(is.na(Biobase::exprs(brcaES))) == 0)
 
-
 #save and clean
 saveRDS(md,  "Med_Data_Clean.rds")
 saveRDS(brcaES, "Gen_Data.rds")
 rm(list = ls())
+
 

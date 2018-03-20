@@ -40,14 +40,8 @@ functions {
 data {
   int<lower=0> Nobs;
   int<lower=0> Ncen;
-  int<lower=0> J1; //cohort
-  int<lower=0> J2; //intClust
   vector[Nobs] yobs;
   vector[Ncen] ycen;
-  int J1obs[Nobs]; //cohort
-  int J1cen[Ncen]; 
-  int J2obs[Nobs]; //intClust
-  int J2cen[Ncen]; 
   int<lower=0> M;
   matrix[Nobs, M] Zobs;
   matrix[Ncen, M] Zcen;
@@ -65,80 +59,52 @@ transformed data {
   N = Nobs + Ncen;
   nu_local = 1; //horshoe prior
   nu_global = 1; //half-cauchy
-  scale_global = .005;
+  scale_global = .007;
+  
 }
 
 parameters {
   real alpha_raw;
   real mu;
   
-  real zeta1;
-  vector[J1] b1;
-  real<lower=0> kappa1;
   
-  real zeta2;
-  vector[J2] b2;
-  real<lower=0> kappa2;
-  
-  vector<lower=0>[J2]tau1_global;
-  vector<lower=0>[J2]tau2_global;
-    
-  vector<lower=0>[J2] tau1_local[M];
-  vector<lower=0>[J2] tau2_local[M];
-  
-  vector[J2] beta_g_raw[M];
+  real<lower=0> tau1_global;
+  real<lower=0> tau2_global;
+  vector<lower=0>[M] tau1_local;
+  vector<lower=0>[M] tau2_local;
+  vector[M] beta_b_raw;
 }
 
 transformed parameters {
   real<lower=0> alpha;
-  matrix[J2,M] beta_g;
-  vector[Nobs] Z_g_obs;
-  vector[Ncen] Z_g_cen;
-
-  for (j in 1:J2){
-     beta_g[j,] = to_row_vector(prior_hs_lp(tau1_global[j], tau2_global[j],tau1_local[j],tau2_local[j], nu_local, scale_global, nu_global) .* beta_g_raw[j]); 
-  }
+  vector[M] beta_b;
+  
+  beta_b = prior_hs_lp(tau1_global, tau2_global, tau1_local, tau2_local, nu_local, scale_global, nu_global) .* beta_b_raw; 
   
   alpha = exp(tau_al * alpha_raw);
-  
-  for(n in 1:Nobs){
-    Z_g_obs[n] = Zobs[n, ] * to_vector(beta_g[J2obs[n],]);
-  }
-  for(n in 1:Ncen){
-    Z_g_cen[n] = Zcen[n, ] * to_vector(beta_g[J2cen[n],]); 
-  }
-
 }
 
 model {
-     yobs ~ weibull(alpha, exp(-( mu + zeta1 + zeta2 + Z_g_obs + b1[J1obs]+  b2[J2obs])/alpha)); 
-
-    target += weibull_lccdf(ycen | alpha, exp(-( mu + zeta1 + zeta2 + Z_g_cen + b1[J1cen]+ b2[J2cen])/alpha)); 
+     yobs ~ weibull(alpha, exp(-( mu +Zobs * beta_b )/alpha)); 
      
-  for(j in 1:J2){
-    beta_g_raw[j] ~ normal(0, 1); 
-  }
-
+     target += weibull_lccdf(ycen | alpha, exp(-( mu + Zcen * beta_b)/alpha)); 
+  
+  beta_b_raw ~ normal(0.0, 1.0);
+  
   alpha_raw ~ normal(0.0, 1.0);
   mu ~ normal(0 , tau_mu);
-  
-  zeta1 ~ normal(0, 1);
-  b1 ~ normal(0, kappa1);
-  kappa1 ~ gamma(2, .1);
-  
-  zeta2 ~ normal(0, 1);
-  b2 ~ normal(0, kappa2);
-  kappa2 ~ gamma(2, .1);
 }
 
 generated quantities {
   vector[N] log_lik;
   
   for (n in 1:Nobs){
-    log_lik[n] = weibull_lpdf(yobs[n] | alpha, exp(-( mu + zeta1 + zeta2 + Z_g_obs[n] + b1[J1obs[n]]+ b2[J2obs[n]])/alpha));
+    log_lik[n] = weibull_lpdf(yobs[n] | alpha, exp(-( mu +  Zobs[n,] * beta_b)/alpha));
   }
   for (n in 1:Ncen){
-    log_lik[Nobs + n] = weibull_lccdf(ycen[n]| alpha, exp(-( mu + zeta1 + zeta2 +Z_g_cen[n]+ b1[J1cen[n]]+ b2[J2cen[n]])/alpha));
+    log_lik[Nobs + n] = weibull_lccdf(ycen[n]| alpha, exp(-( mu  +Zcen[n,] * beta_b)/alpha));
   }
   
 }
+
+

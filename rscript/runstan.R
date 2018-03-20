@@ -7,9 +7,11 @@ library(rstan)
 library(loo)
 library(caret)
 library(Biobase)
-memory.limit(1e10)
+
 md <- read_rds("C:/RFactory/bymetabric_files/rdsmetabric/Med_Data_Clean.rds")
 gd <- read_rds("C:/RFactory/bymetabric_files/rdsmetabric/Gen_Data.rds")
+md <- read_rds("Med_Data_Clean.rds")
+gd <- read_rds("Gen_Data.rds")
 load("Gen_data_fun.Rdata")
 # Run null model
 stan_file_null <- "bybrca/stan/null.stan"
@@ -25,7 +27,7 @@ stannull <- rstan::stan(stan_file_null,
 log_liknull <- loo::extract_log_lik(stannull, parameter_name = "log_lik")
 loonull <- loo::loo(log_liknull)
 print(loonull)
-saveRDS(stannull, file = "C:/RFactory/bymetabric_files/bysfit/stannul.rds")
+saveRDS(stannull, file = "bysfit/stannul.rds")
 rm(list = c('stannull', 'log_liknull'))
 
 
@@ -44,7 +46,7 @@ log_liknullml <- loo::extract_log_lik(stannullml, parameter_name = "log_lik")
 loonullml <- loo::loo(log_liknullml)
 print(loonullml)
 compare(loonull, loonullml) #preference for the second model!
-saveRDS(stannullml, file = "bysfit/nullml.rds")
+saveRDS(stannullml, file = "C:/RFactory/bymetabric_files/bysfit/nullml.rds")
 rm(list = c('stannullml', 'log_liknullml'))
 
 #---------------------------------------
@@ -72,7 +74,8 @@ rm(list = c('stanclinml', 'log_likclin'))
 
 #---------------------------------------
 ##Run Ml Stan with genomic
-stan_file_gen <- "bybrca/stan/genml.stan"
+#stan_file_gen <- "bybrca/stan/genselect.stan"
+stan_file_gen <-"C:/RFactory/bymetabric/bybrca/stan/genml.stan"
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 nChain <- 1
@@ -81,8 +84,8 @@ stangene <- rstan::stan(stan_file_gen,
                                               es = gd),
                         cores = min(nChain, parallel::detectCores()),
                         chains = nChain,
-                        iter = 5,
-                        init = gen_inits3(J1 = 5, J2 = 11, M = 24368))
+                        iter = 50,
+                        init = gen_inits3(J1 = 5, J2 = 11, M = 4715))
 # if (interactive())
 #   shinystan::launch_shinystan(stanfit)
 
